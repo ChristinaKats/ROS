@@ -1,0 +1,17 @@
+<launch>
+	<param name="/usr_sin_time" value="true"/>
+
+
+	<!-- Run the map_server -->
+	<node name="map_server" pkg="map_server" type="map_server" args="$(find provide_map)/maps/map.yaml" >
+	<param name="frame_id" value="/map" />
+	</node>
+
+
+	<include file="$(find multiple_turtlebots_nav)/launch/amcl_robot1.launch" />
+	<include file="$(find multiple_turtlebots_nav)/launch/amcl_robot2.launch" />
+
+	<node type="rviz" name="rviz" pkg="rviz" />
+
+
+</launch>

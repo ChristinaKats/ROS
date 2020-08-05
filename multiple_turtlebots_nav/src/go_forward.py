@@ -27,16 +27,16 @@ class GoForward(): # go straight until you reach an odstacl
 
 		self.map_data = numpy.zeros(shape=(400,400))
 
-		r = rospy.Rate(10);
+		r = rospy.Rate(10)
 
 		# move turtlebot
 		move_cmd = Twist()
-		move_cmd.linear.x = 0.8 # go forward at 0.5 m/s
+		move_cmd.linear.x = 0.5 # go forward at 0.5 m/s
 		move_cmd.angular.z = 0 # go straight only
 
 
 		while not rospy.is_shutdown(): # Ctr + c
-			if self.check_next_pos():
+			if self.check_next_pos_scan():
 				self.cmd_vel.publish(move_cmd)
 			else:
 				move_cmd.linear.x = 0 # stop moving
@@ -51,7 +51,7 @@ class GoForward(): # go straight until you reach an odstacl
 
 		move_cmd = Twist()
 		move_cmd.linear.x = 0 # stop moving
-		move_cmd.angular.z = 0 # go straight only
+		move_cmd.angular.z = 0 # stop turning
 
 		self.cmd_vel.publish(move_cmd)
 		rospy.sleep(1)
@@ -107,9 +107,14 @@ class GoForward(): # go straight until you reach an odstacl
 			
 			# # 135 <= degrees < 180
 			# elif self.degrees >= 135 and self.degrees < 180:
-				
+
 
 		return True
+
+	def check_next_pos_scan(self):
+		
+		return True
+
 
 	def map_occupancy(self, m_data):
 		self.map_data = m_data.data
