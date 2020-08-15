@@ -10,8 +10,7 @@ from sensor_msgs.msg import LaserScan
 
 
 class GoForward(): # go straight until you reach an odstacle 
-# The goal is to find a random wall so later the turtlebot can follow it
-
+	# The goal is to find a random wall so later the turtlebot can follow it
 	def __init__(self):
 
 		print 'Started'
@@ -65,7 +64,7 @@ class GoForward(): # go straight until you reach an odstacle
 		# rospy.loginfo(self.infront_distance)
 
 		# If there is an odstacle 2.5m ahead, you should stop moving
-		if math.isnan(self.infront_distance) == False and self.infront_distance < 2.5: 
+		if math.isnan(self.infront_distance) == False and self.infront_distance < 1.5: 
 			return False
 		else: # else, free space continue straight
 			return True
@@ -81,7 +80,7 @@ class GoForward(): # go straight until you reach an odstacle
 		orientation_list = [orientation_q.x, orientation_q.y, orientation_q.z, orientation_q.w]
 		(roll, pitch, yaw) = euler_from_quaternion (orientation_list)
 		# yaw euler
-		self.degrees = (yaw)/(2 * math.pi) * 360 # degrees
+		self.degrees = math.degrees(yaw) # degrees
 		# print degrees
 
  
