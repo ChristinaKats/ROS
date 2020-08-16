@@ -40,6 +40,7 @@ class GoForward(): # go straight until you reach an odstacle
 				move_cmd.linear.x = 0 # stop moving
 				move_cmd.angular.z = 0 # stop turning
 				self.cmd_vel.publish(move_cmd)
+				break
 
 			r.sleep()
 

@@ -18,6 +18,7 @@ class WallFollow(): # follow the wall until you return at your initial position
         rospy.init_node('WallFollow', anonymous=False)
         self.distances = []
         self.my_odom = Odometry
+        # self.init_position = Odometry
 
         self.roll = self.pitch = self.yaw = 0.0
 
@@ -28,28 +29,14 @@ class WallFollow(): # follow the wall until you return at your initial position
         sub = rospy.Subscriber ('/odom', Odometry, self.get_rotation)
 
         r = rospy.Rate(1)
-        # while not rospy.is_shutdown():
-            # quat = quaternion_from_euler(roll, pitch, yaw)
-            # print quat
-            # r.sleep()
 
         self.right_hand_on_wall()
 
-        # while not rospy.is_shutdown(): # Ctr + c
-            # self.right_hand_on_wall()
-            # self.touch_wall()
-            # r.sleep()
-
-
     def get_rotation(self, msg):
-        # global roll, pitch, yaw
         self.my_odom = msg
         orientation_q = msg.pose.pose.orientation
         orientation_list = [orientation_q.x, orientation_q.y, orientation_q.z, orientation_q.w]
         (self.roll, self.pitch, self.yaw) = euler_from_quaternion(orientation_list)
-        # res = math.degrees(yaw)
-        # print res
-
 
     def right_hand_on_wall(self):
         while len(self.distances) == 0:
@@ -77,7 +64,7 @@ class WallFollow(): # follow the wall until you return at your initial position
         return
 
     def turn_until_right_hand_on_wall(self):
-        rospy.loginfo('turn_until_right_hand_on_wall')
+        # rospy.loginfo('turn_until_right_hand_on_wall')
 
         min_element = min(self.distances)
         # rospy.loginfo('min == %f', min_element)
@@ -94,7 +81,7 @@ class WallFollow(): # follow the wall until you return at your initial position
             min_element = min(self.distances)
             # rospy.loginfo('min == %f', min_element)
             pos_min_element = self.distances.index(min_element)
-            rospy.loginfo('min pos == %d', pos_min_element)
+            # rospy.loginfo('min pos == %d', pos_min_element)
 
         move_cmd.linear.x = 0 # do not move 
         move_cmd.angular.z = 0 # stop turning
@@ -109,14 +96,14 @@ class WallFollow(): # follow the wall until you return at your initial position
 
         
     def turn_90_degrees(self):
-        rospy.loginfo('turn 90')
+        # rospy.loginfo('turn 90')
 
         move_cmd = Twist()
         # get the current orientation
         current_orient = math.degrees(self.yaw)
         end_orient = math.degrees(self.yaw)
         while end_orient - current_orient < 89:
-            rospy.loginfo('angle == %d', end_orient - current_orient)
+            # rospy.loginfo('angle == %d', end_orient - current_orient)
             move_cmd.linear.x = 0 # do not move 
             move_cmd.angular.z = 0.1 # turn only
             self.cmd_vel.publish(move_cmd)
@@ -127,13 +114,20 @@ class WallFollow(): # follow the wall until you return at your initial position
         self.cmd_vel.publish(move_cmd)
 
     def walk_by_the_wall(self):
-        rospy.loginfo('walk by the wall')
+        # rospy.loginfo('walk by the wall')
 
         # if you touch the wall, go straight
         move_cmd = Twist()
+        distance_from_init = 0
+        # max_distance_from_init = 0
 
-        while not rospy.is_shutdown(): # Ctr + c
-        
+        # while not rospy.is_shutdown(): # Ctr + c
+        init_position_x = self.my_odom.pose.pose.position.x
+        init_position_y = self.my_odom.pose.pose.position.y
+
+        flag = False
+
+        while distance_from_init > 2 or flag == False:
             # rospy.loginfo(self.distances[0])
 
 
@@ -142,30 +136,33 @@ class WallFollow(): # follow the wall until you return at your initial position
                 move_cmd.angular.z = 0 # do not turn 
                 self.cmd_vel.publish(move_cmd)
 
-            # move_cmd.linear.x = 0 # do not move 
-            # move_cmd.angular.z = 0 # stop turning
-            # self.cmd_vel.publish(move_cmd)
+                curr_position_x = self.my_odom.pose.pose.position.x
+                curr_position_y = self.my_odom.pose.pose.position.y
 
+                distance_from_init = math.sqrt((curr_position_x - init_position_x)*(curr_position_x - init_position_x) + (curr_position_y - init_position_y)*(curr_position_y - init_position_y))
+                if distance_from_init > 2:
+                    flag = True
+            
+                rospy.loginfo('distance = %f', distance_from_init)
 
-            # if math.isnan(self.distances[320]) == False and self.distances[320] <= 1.5:
-                # self.turn_until_right_hand_on_wall()
+                if distance_from_init <= 2 and flag == True:
+                    break
 
             if (math.isnan(self.distances[0]) == False and self.distances[0] <= 1.7 and self.distances[0] > 0) or (math.isnan(self.distances[320]) == False and self.distances[320] <= 1.5 and self.distances[320] > 0):
-                rospy.loginfo('turn left %f, %f', self.distances[0], self.distances[320])
-                # rospy.loginfo(self.distances[0])
+                # rospy.loginfo('turn left %f, %f', self.distances[0], self.distances[320])
 
                 move_cmd.linear.x = 0 # stop moving 
                 move_cmd.angular.z = 0.1 # turn left 
                 self.cmd_vel.publish(move_cmd)
 
             elif self.distances[0] > 4:
-                rospy.loginfo('turn right')
+                # rospy.loginfo('turn right')
                 move_cmd.linear.x = 0 # stop moving 
                 move_cmd.angular.z = -0.1 # turn left 
                 self.cmd_vel.publish(move_cmd)
 
             elif math.isnan(self.distances[0]) or self.distances[0] < 0:
-                rospy.loginfo('go strainght and turn right')
+                # rospy.loginfo('go strainght and turn right')
                 init_pose_x = self.my_odom.pose.pose.position.x
                 init_pose_y = self.my_odom.pose.pose.position.y
                 distance = 0
@@ -183,18 +180,15 @@ class WallFollow(): # follow the wall until you return at your initial position
                     move_cmd.linear.x = 0 # stop moving 
                     move_cmd.angular.z = -0.1 # turn left 
                     self.cmd_vel.publish(move_cmd)
-                
-                # move_cmd.linear.x = 0 # stop moving 
-                # move_cmd.angular.z = -0.1 # turn left 
-                # self.cmd_vel.publish(move_cmd)
-                           
 
-            # rospy.loginfo(self.distances)
-            # move_cmd.linear.x = 0 # do not move 
-            # move_cmd.angular.z = 0 # stop turning
-            # self.cmd_vel.publish(move_cmd)
-        
-        # self.walk_by_the_wall()
+            curr_position_x = self.my_odom.pose.pose.position.x
+            curr_position_y = self.my_odom.pose.pose.position.y
+
+            distance_from_init = math.sqrt((curr_position_x - init_position_x)*(curr_position_x - init_position_x) + (curr_position_y - init_position_y)*(curr_position_y - init_position_y))
+            if distance_from_init > 2:
+                flag = True
+            
+            rospy.loginfo('distance = %f', distance_from_init)
 
 
     
