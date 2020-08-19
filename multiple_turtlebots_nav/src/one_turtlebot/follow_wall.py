@@ -169,7 +169,7 @@ class WallFollow(): # follow the wall until you return at your initial position
             if distance_from_init > 2: # if the turtlebot moved at least 2m from the initial position
                 flag = True
             
-            # rospy.loginfo('distance = %f', distance_from_init)
+            rospy.loginfo('distance = %f', distance_from_init)
 
 
     def shutdown(self): # stop turtlebot
