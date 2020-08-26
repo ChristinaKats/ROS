@@ -5,6 +5,9 @@ import numpy
 from geometry_msgs.msg import Pose
 from std_msgs.msg import String
 from multiple_turtlebots_nav.msg import Num
+import itertools
+import csv
+
 
 class PublicMetr():
 
@@ -12,25 +15,31 @@ class PublicMetr():
 		print 'Publishing Metrics'
 		rospy.on_shutdown(self.shutdown)
 
-		# rospy.init_node('PublicMetr', anonymous=False)
-
 		self.sub_metrics = rospy.Publisher('metrics_topic', Num, queue_size=10)
 		rospy.init_node('metrics', anonymous=True)
 
 		rate = rospy.Rate(1)
 
-		# num = "hello"
+		with open('/home/christina/catkin_ws/src/multiple_turtlebots_nav/src/data_source_one.csv', mode='r') as csv_file:
+			csv_reader = csv.reader(csv_file, delimiter=',')
+			data_tuple = [tuple(row) for row in csv_reader]
+
+			columns = len(data_tuple[0])
+			rows = len(data_tuple)
 
 		num = Num()
-		num.width = 2
-		num.height = 2
+		num.width = columns
+		num.height = rows
 
-		# num = Num()
-		# num.width = 4
-		# num.height = 10
-		# num.data = numpy.zeros(shape=(400,400))
+		a = []
 
-		num.data = [1, 2, 3, 4, 5, 6]
+		for data in data_tuple:
+			for data1 in data:
+				a.append(int(float(data1)))
+		
+		num.data = a
+		rospy.loginfo(num.data)
+		
 		while not rospy.is_shutdown(): # Ctr + c
 			rospy.loginfo("publishing")
 			self.sub_metrics.publish(num)
@@ -39,7 +48,6 @@ class PublicMetr():
 
 	def shutdown(self):
 		rospy.loginfo("Stop Publishing")
-
 		rospy.sleep(1)
 
 
