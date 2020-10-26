@@ -51,6 +51,8 @@ find_package(catkin REQUIRED COMPONENTS
  add_message_files(
    FILES
    Num.msg
+   Best_Metric.msg
+   Best_Metric_send.msg
  )
 
 ## Generate services in the 'srv' folder

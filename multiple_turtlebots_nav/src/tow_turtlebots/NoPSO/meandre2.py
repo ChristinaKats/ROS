@@ -17,47 +17,57 @@ class Meandre():
     def __init__(self):
         self.start = time.time()
         rospy.on_shutdown(self.shutdown)
-        rospy.init_node('Meandre', anonymous=False)
+        rospy.init_node('Meandre2', anonymous=False)
 
+        # initialize needed variables
         self.distances = [] # laserscan distances
-        self.my_odom = Odometry # my position (odom topic)
+        self.my_odom = Odometry() # my position (odom topic)
+        self.my_odom.pose.pose.position.x = 1
+        self.my_odom.pose.pose.position.y = 1
+        [self.my_odom.pose.pose.orientation.x, self.my_odom.pose.pose.orientation.y, self.my_odom.pose.pose.orientation.z, self.my_odom.pose.pose.orientation.w] = quaternion_from_euler(0,0, 1.8415926) 
         self.roll = self.pitch = self.yaw = 0.0
         self.metrics = Num
         self.global_best_value = Best_Metric
         self.global_best_value.metric = -1
+        self.friends_pos = Odometry
 
-        self.scans = rospy.Subscriber('/scan', LaserScan, self.my_distances)
-
-        self.cmd_vel = rospy.Publisher('/cmd_vel_mux/input/navi', Twist, queue_size=10)
-        sub = rospy.Subscriber ('/odom', Odometry, self.get_rotation)
-
+        # Subscribe/Publish topics
+        self.scans = rospy.Subscriber('/robot2/scan', LaserScan, self.my_distances)
+        self.cmd_vel = rospy.Publisher('/robot2/cmd_vel_mux/input/navi', Twist, queue_size=10)
+        rospy.Subscriber ('/robot2/odom', Odometry, self.get_rotation)
+        rospy.Subscriber ('/robot1/odom', Odometry, self.get_friends_pos)
         self.global_best = rospy.Publisher('/global_best', Best_Metric, queue_size=10)
-        current_best = rospy.Subscriber('/global_best', Best_Metric, self.read_global_best)
-
         self.sub_metrics = rospy.Subscriber('/metrics_topic', Num, self.read_metrics)
 
         self.csv_rows = []
-
         self.prev_pos_x = 0
         self.prev_pos_y = 0
 
         rospy.sleep(1)
 
-        # self.go_forward()
         self.find_random_wall()
         self.right_hand_on_wall() # turn to touch the wall with the right hand
         self.meandre_walkthrough()
 
+    def get_friends_pos(self, data):
+        self.friends_pos = data
+
+    def distance_from_other_turtle(self):
+        x = (self.my_odom.pose.pose.position.x - self.friends_pos.pose.pose.position.x) * (self.my_odom.pose.pose.position.x - self.friends_pos.pose.pose.position.x)
+        y = (self.my_odom.pose.pose.position.y - self.friends_pos.pose.pose.position.y) * (self.my_odom.pose.pose.position.y - self.friends_pos.pose.pose.position.y)
+
+        distance = math.sqrt(x + y)
+        return distance
+
+
     def find_random_wall(self):
         while self.check_next_pos_scan(): # free space in front of the turtlebot
-            # rospy.loginfo('sth')
             move_cmd = Twist()
             move_cmd.linear.x = 0.5 # go forward at 0.5 m/s
             move_cmd.angular.z = 0 # go straight only
             self.cmd_vel.publish(move_cmd)
 
     def check_next_pos_scan(self):
-        # rospy.loginfo(self.distances[320])
 		# If there is an odstacle 1.5m ahead, you should stop moving
         if math.isnan(min(self.distances)) == False and min(self.distances) < 1.5 and min(self.distances) > 0: 
 	        return False
@@ -76,10 +86,9 @@ class Meandre():
         # follow the wall
         self.walk_by_the_wall()
 
-    def turn_until_right_hand_on_wall(self):
+    def turn_until_right_hand_on_wall(self): # Turn so that your right hand faces the wall
         min_element = min(self.distances) # closest obstacle
         pos_min_element = self.distances.index(min_element) # relative position of obstacle and turtlebot 
-        
         move_cmd = Twist()
 
         # face the wall
@@ -89,9 +98,10 @@ class Meandre():
             move_cmd.angular.z = 0.1 # turn only
             self.cmd_vel.publish(move_cmd)
 
-            min_element = min(self.distances)
+            min_element = min(self.distances) # min distance from obstacle
             pos_min_element = self.distances.index(min_element)
 
+        # stop moving
         move_cmd.linear.x = 0 # do not move 
         move_cmd.angular.z = 0 # stop turning
         self.cmd_vel.publish(move_cmd)
@@ -108,10 +118,10 @@ class Meandre():
 
         return max_dist
 
-    def walk_by_the_wall(self):
+    def walk_by_the_wall(self): # follow the wall
         # if you touch the wall, go straight
         move_cmd = Twist()
-        distance_from_init = 0
+        distance_from_init = 0 # distance from initial position
 
         # initial position of the turtlebot when it first touched the wall
         init_position_x = self.my_odom.pose.pose.position.x
@@ -129,16 +139,16 @@ class Meandre():
                 move_cmd.angular.z = 0 # do not turn 
                 self.cmd_vel.publish(move_cmd)
 
+                # my current position
                 curr_position_x = self.my_odom.pose.pose.position.x
                 curr_position_y = self.my_odom.pose.pose.position.y
 
+                # calculate the distance of the current position from the initial position
                 distance_from_init = math.sqrt((curr_position_x - init_position_x)*(curr_position_x - init_position_x) + (curr_position_y - init_position_y)*(curr_position_y - init_position_y))
-                if distance_from_init > 4:
+                if distance_from_init > 4: # you moved far enough from the initial position
                     flag = True
             
-                # rospy.loginfo('distance = %f', distance_from_init)
-
-                if distance_from_init <= 4 and flag == True:
+                if distance_from_init <= 4 and flag == True: # initial position reached
                     break
 
             # if you got to close to the wall, turn left
@@ -179,39 +189,25 @@ class Meandre():
             distance_from_init = math.sqrt((curr_position_x - init_position_x)*(curr_position_x - init_position_x) + (curr_position_y - init_position_y)*(curr_position_y - init_position_y))
             if distance_from_init > 4: # if the turtlebot moved at least 2m from the initial position
                 flag = True
-            
-            # rospy.loginfo('distance = %f', distance_from_init)
-
 
     def read_metrics(self, data):
-        self.metrics = data
-
-        # rospy.loginfo(data)
+        self.metrics = data # read data from topic
 
         # current position
         my_position_x = int(self.my_odom.pose.pose.position.x)
         my_position_y = int(self.my_odom.pose.pose.position.y)
 
-        # rospy.loginfo('x = %d', my_position_x)
-        # rospy.loginfo('y = %d', my_position_y)
-
-        # rospy.loginfo('array pos = %d', (my_position_x+100) * 400 + my_position_y+100)
-
-        curr_metric = Best_Metric
         # metrics in this position
-        curr_metric.metric = self.metrics.data[(my_position_y+150) * 400 + my_position_x+210]
+        curr_metric = Best_Metric
+        curr_metric.metric = self.metrics.data[(my_position_x+200) * 400 + my_position_y+200]
         curr_metric.position_x = my_position_x
         curr_metric.position_y = my_position_y
 
-
-        rospy.loginfo('metric %f', curr_metric.metric)
-
+        # new best metric found
         if self.global_best_value.metric < curr_metric.metric:
             self.global_best.publish(curr_metric)
-            rospy.loginfo('new best')
 
         curr_time = time.time() - self.start
-        
         if my_position_x != self.prev_pos_x or my_position_y != self.prev_pos_y:
             row = []
             row.append(curr_time)
@@ -219,24 +215,14 @@ class Meandre():
             row.append(my_position_y)
             row.append(curr_metric.metric)
 
-            rospy.loginfo(row)
-
-
-            # rospy.loginfo(row)
-
             self.csv_rows.append(row)
-
             self.prev_pos_x = my_position_x
             self.prev_pos_y = my_position_y
 
-        # rospy.loginfo(self.csv_rows)
-        # rospy.loginfo('sth----------------------')
-
-        
-    def read_global_best(self, best):
+    def read_global_best(self, best): # read current best value
         self.global_best_value = best
 
-    def my_distances(self, laser_data):
+    def my_distances(self, laser_data): # process laser_scan data
         self.distances = laser_data.ranges
         max_dist = self.find_max()
 
@@ -245,7 +231,6 @@ class Meandre():
                 temp_list = list(self.distances)
                 temp_list[i] = 10*max_dist
                 self.distances = tuple(temp_list)
-        
         return
 
     def find_max(self): # max element of distances list
@@ -258,72 +243,52 @@ class Meandre():
         return max_dist
 
     def meandre_walkthrough(self):
-
-        meters = 3
-
+        meters = 5
         threshhold = 2
         count = 0
         self.face_the_wall()
 
         move_cmd = Twist()
-        for i in range(3):
-            move_cmd.linear.x = -0.5 # do not move 
-            move_cmd.angular.z = 0 # turn only
-            self.cmd_vel.publish(move_cmd)
 
-        while True: 
+        while count < threshhold: 
+            # if you reach the wall with an angle, turn to face it
             if self.distances.index(min(self.distances)) > 370 or self.distances.index(min(self.distances)) < 300:
-                rospy.loginfo('face the wall')
                 self.face_the_wall()
 
             self.turn_90_degrees_left()
-            result = self.go_forward_3m(meters, 'r')
-            if result == False:
-                rospy.loginfo('result = False')
-
+            result = self.go_forward_5m(meters, 'r')
+            if result == False: # obstacle ahead
                 self.turn_90_degrees_left()
                 self.go_forward()
 
                 self.turn_90_degrees_left()
-                self.go_forward_3m(meters, 'r')
-
+                self.go_forward_5m(meters, 'r')
                 count += 1
 
-            
-            
             self.turn_90_degrees_left()
             self.go_forward()
 
-
+            # if you reach the wall with an angle, turn to face it
             if self.distances.index(min(self.distances)) > 370 or self.distances.index(min(self.distances)) < 300:
-                rospy.loginfo('face the wall')
                 self.face_the_wall()
 
 
             self.turn_90_degrees_right()
-            result = self.go_forward_3m(meters, 'l')
-            if result == False:
-                rospy.loginfo('result = False')
-
+            result = self.go_forward_5m(meters, 'l')
+            if result == False: # obstacle ahead
                 self.turn_90_degrees_right()
                 self.go_forward()
 
                 self.turn_90_degrees_right()
-                self.go_forward_3m(meters, 'l')
-
+                self.go_forward_5m(meters, 'l')
                 count += 1
 
             self.turn_90_degrees_right()
             self.go_forward()
 
-            if count == threshhold:
-                return
-
-
-    def face_the_wall(self):
+    def face_the_wall(self): # turn the turtlebot to face the wall
         min_element = min(self.distances) # closest obstacle
         pos_min_element = self.distances.index(min_element) # relative position of obstacle and turtlebot 
-        
         move_cmd = Twist()
 
         r = rospy.Rate(15)
@@ -337,38 +302,27 @@ class Meandre():
             min_element = min(self.distances)
             pos_min_element = self.distances.index(min_element)
 
-            # rospy.loginfo(pos_min_element)
             r.sleep()
             
-
         move_cmd.linear.x = 0 # do not move 
         move_cmd.angular.z = 0 # stop turning
         self.cmd_vel.publish(move_cmd)
 
-
-    def go_forward_3m(self, meters, hand):
-        rospy.loginfo('go forward 3 meters')
-
-        rospy.sleep(1)
+    def go_forward_5m(self, meters, hand):
         init_yaw = self.yaw
-        rospy.loginfo(init_yaw)
-
         move_cmd = Twist()
-
         distance_from_init = 0
         
+        # turtlebot's initial position
         init_position_x = self.my_odom.pose.pose.position.x
         init_position_y = self.my_odom.pose.pose.position.y
 
         r = rospy.Rate(10)
-
         while distance_from_init < 3: 
             if math.isnan(self.distances[320]) == False and self.distances[320] <= 3 and self.distances[320] > 0:
                 return False
 
-
             if hand == 'r':
-                # rospy.loginfo('r')
                 # if you got to close to the wall, turn left
                 if math.isnan(self.distances[0]) == False and self.distances[0] <= 3.5 and self.distances[0] > 0:
                     move_cmd.linear.x = 0 # stop moving 
@@ -376,22 +330,17 @@ class Meandre():
                     self.cmd_vel.publish(move_cmd)
                     init_yaw = self.yaw
 
-                    # rospy.loginfo('nai')
-
                 elif self.distances[0] > 6: # if you break away from the wall, turn right
                     move_cmd.linear.x = 0 # stop moving 
                     move_cmd.angular.z = -0.1 # turn right 
                     self.cmd_vel.publish(move_cmd)
                     init_yaw = self.yaw
 
-
             else:
-                # rospy.loginfo('l')
-
                 # if you got to close to the wall, turn right
                 if math.isnan(self.distances[639]) == False and self.distances[639] <= 3.5 and self.distances[639] > 0:
                     move_cmd.linear.x = 0 # stop moving 
-                    move_cmd.angular.z = -0.1 # turn left 
+                    move_cmd.angular.z = -0.1 # turn right 
                     self.cmd_vel.publish(move_cmd)
                     init_yaw = self.yaw
 
@@ -402,66 +351,48 @@ class Meandre():
                     self.cmd_vel.publish(move_cmd)
                     init_yaw = self.yaw
 
-
-
-            move_cmd.linear.x = 0.3 # go strauight 
+            move_cmd.linear.x = 0.3 # go straight 
             move_cmd.angular.z = 0 # do not turn
             self.cmd_vel.publish(move_cmd)
-            # rospy.loginfo(math.degrees(self.yaw))
             current_yaw = self.yaw
 
-            if current_yaw - init_yaw > 0.1:
+            if current_yaw - init_yaw > 0.1: # correct the angle
                 # rospy.loginfo('turn right')
                 move_cmd.linear.x = 0 # go strauight 
                 move_cmd.angular.z = -0.1 # do not turn
                 self.cmd_vel.publish(move_cmd)
 
-            elif current_yaw - init_yaw < -0.1:
-                # rospy.loginfo('turn left')
-
+            elif current_yaw - init_yaw < -0.1:# correct the angle
                 move_cmd.linear.x = 0 # go strauight 
                 move_cmd.angular.z = 0.1 # do not turn
                 self.cmd_vel.publish(move_cmd)
 
-
             if abs(current_yaw - init_yaw) > 1:
                 init_yaw = current_yaw
 
+            # calculate the distance from initial position
             curr_position_x = self.my_odom.pose.pose.position.x
             curr_position_y = self.my_odom.pose.pose.position.y
-
             distance_from_init = math.sqrt((curr_position_x - init_position_x)*(curr_position_x - init_position_x) + (curr_position_y - init_position_y)*(curr_position_y - init_position_y))
-            # if distance_from_init > 2:
-                # flag = True 
             
             r.sleep()
             
         move_cmd.linear.x = 0 # do not move     
         move_cmd.angular.z = 0 # stop turning
         self.cmd_vel.publish(move_cmd)
-        # rospy.loginfo('go forward end')
-
         return True
 
 
-    def go_forward(self):
-        rospy.loginfo('go forward')
+    def go_forward(self): # go forward untill you reach an obstacle
         rospy.sleep(1)
-
         close_to_wall = False
-
         init_yaw = self.yaw
-
         move_cmd = Twist()
         r = rospy.Rate(10)
         while math.isnan(self.distances[320]) or self.distances[320] > 3 or self.distances[320] < 0:
-
-            # rospy.loginfo(min(self.distances))
             if math.isnan(min(self.distances)) == False and min(self.distances) < 3 and min(self.distances) > 0:
                 close_to_wall = True
-                # rospy.loginfo('plisiase poly')
                 break
-                # edo to break prepei na allaksei 
             
             move_cmd.linear.x = 0.3 # go strauight 
             move_cmd.angular.z = 0 # do not turn
@@ -469,58 +400,48 @@ class Meandre():
 
             current_yaw = self.yaw
             if current_yaw - init_yaw > 0.1:
-                # rospy.loginfo('turn right')
                 move_cmd.linear.x = 0 # go strauight 
                 move_cmd.angular.z = -0.1 # do not turn
                 self.cmd_vel.publish(move_cmd)
 
             elif current_yaw - init_yaw < -0.1:
-                # rospy.loginfo('turn left')
                 move_cmd.linear.x = 0 # go strauight 
                 move_cmd.angular.z = 0.1 # do not turn
                 self.cmd_vel.publish(move_cmd)
 
-
             if abs(current_yaw - init_yaw) > 1:
                 init_yaw = current_yaw
 
-            
             r.sleep()
 
         if close_to_wall == True:
+            if self.distance_from_other_turtle() < 3:
+                for i in range(5):
+                    rospy.sleep(1)
 
-            rospy.loginfo('too close, %d', self.distances.index(min(self.distances)))
+                self.go_forward()
+                return
             if self.distances.index(min(self.distances)) < 320:
-                # rospy.loginfo('too close 1')
-
                 while math.isnan(self.distances[320]) or self.distances[320] > 3 or self.distances[320] < 0: 
 
                     while self.distances[0] > 3 and self.distances[0] < 6 and (math.isnan(self.distances[320]) or self.distances[320] > 3 or self.distances[320] < 0): #follow wall
                         move_cmd.linear.x = 0.3 # go straight 
                         move_cmd.angular.z = 0 # do not turn 
                         self.cmd_vel.publish(move_cmd)
-                        # rospy.loginfo('while straight')
 
                     # if you got to close to the wall, turn left
                     if (math.isnan(self.distances[0]) == False and self.distances[0] <= 3 and self.distances[0] > 0) or (math.isnan(self.distances[320]) == False and self.distances[320] <= 3 and self.distances[320] > 0):
                         move_cmd.linear.x = 0 # stop moving 
                         move_cmd.angular.z = 0.1 # turn left 
                         self.cmd_vel.publish(move_cmd)
-                        # rospy.loginfo('if 1')
-
 
                     elif self.distances[0] > 6: # if you break away from the wall, turn right
                         move_cmd.linear.x = 0 # stop moving 
                         move_cmd.angular.z = -0.1 # turn right 
                         self.cmd_vel.publish(move_cmd)
-                        # rospy.loginfo('if else')
-
 
             else: 
-                # rospy.loginfo('too close 2')
-
                 while  math.isnan(self.distances[320]) or self.distances[320] > 3 or self.distances[320] < 0: 
-
                     while self.distances[639] > 1.7 and self.distances[639] < 4 and (math.isnan(self.distances[320]) or self.distances[320] > 3 or self.distances[320] < 0): #follow wall
                         move_cmd.linear.x = 0.3 # go straight 
                         move_cmd.angular.z = 0 # do not turn 
@@ -540,7 +461,6 @@ class Meandre():
         move_cmd.linear.x = 0 # do not move     
         move_cmd.angular.z = 0 # stop turning
         self.cmd_vel.publish(move_cmd)
-        # rospy.loginfo('go forward end')
 
 
     def get_rotation(self, msg): # the orientation of the turtlebot
@@ -548,22 +468,14 @@ class Meandre():
         orientation_q = msg.pose.pose.orientation
         orientation_list = [orientation_q.x, orientation_q.y, orientation_q.z, orientation_q.w]
         (self.roll, self.pitch, self.yaw) = euler_from_quaternion(orientation_list)
-        # rospy.loginfo(self.yaw)
-
-
     
     def turn_90_degrees_left(self):
-        rospy.loginfo('turn left')
-
         move_cmd = Twist()
         # get the current orientation
         current_orient = math.degrees(self.yaw)
         end_orient = math.degrees(self.yaw)
 
-        # rospy.sleep(1)
         r = rospy.Rate(10)
-
-        rospy.loginfo(current_orient)
         if current_orient >= 0 and current_orient <= 90:
             while end_orient - current_orient < 90: # turn 90 degreess
                 move_cmd.linear.x = 0 # do not move 
@@ -576,13 +488,11 @@ class Meandre():
             count = 0
 
             while count < 5 or end_orient > 0 or (math.fabs(end_orient) + current_orient > 270): # turn 90 degreess
-                # rospy.loginfo('mpainei')
                 move_cmd.linear.x = 0 # do not move 
                 move_cmd.angular.z = 0.1 # turn only
                 self.cmd_vel.publish(move_cmd)
                 end_orient = math.degrees(self.yaw)
                 count += 1
-                # rospy.login
                 r.sleep()
 
         elif current_orient < 0 and current_orient > -90:
@@ -605,41 +515,21 @@ class Meandre():
         move_cmd.angular.z = 0 # stop turning   
         self.cmd_vel.publish(move_cmd)
 
-
     def turn_90_degrees_right(self):
-        rospy.loginfo('turn right')
-
-        
-
         move_cmd = Twist()
         # get the current orientation
         current_orient = math.degrees(self.yaw)
         end_orient = math.degrees(self.yaw)
-
-        # rospy.sleep(1)
-
         r = rospy.Rate(10)
-
-        rospy.loginfo('curr = %f',current_orient)
-
         if current_orient > 0 and current_orient < 90:
-            rospy.loginfo('0 - 90')
-            # rospy.loginfo('curr = %f',current_orient)
-
-            # rospy.loginfo(math.fabs(end_orient) + current_orient)
             while current_orient - end_orient < 90: # turn 90 degreess
                 move_cmd.linear.x = 0 # do not move 
                 move_cmd.angular.z = -0.1 # turn only
                 self.cmd_vel.publish(move_cmd)
                 end_orient = math.degrees(self.yaw)
-                # rospy.loginfo(math.fabs(end_orient) + current_orient)
                 r.sleep()
-            # rospy.loginfo('end = %f',current_orient)
-
 
         elif current_orient > 90 and current_orient <= 180:
-            rospy.loginfo('90 - 180')
-
             while current_orient - end_orient < 87: # turn 90 degreess
                 move_cmd.linear.x = 0 # do not move 
                 move_cmd.angular.z = -0.1 # turn only
@@ -648,7 +538,6 @@ class Meandre():
                 r.sleep()
 
         elif current_orient < 0 and current_orient > -90:
-            rospy.loginfo('-90 - 0')
             while current_orient - end_orient < 90: # turn 90 degreess
                 move_cmd.linear.x = 0 # do not move 
                 move_cmd.angular.z = -0.1 # turn only
@@ -657,16 +546,12 @@ class Meandre():
                 r.sleep()
 
         else :
-            rospy.loginfo('else')
             while end_orient < 0 or end_orient - (current_orient + 180) > 90: # turn 90 degreess
                 move_cmd.linear.x = 0 # do not move 
                 move_cmd.angular.z = -0.1 # turn only
                 self.cmd_vel.publish(move_cmd)
                 end_orient = math.degrees(self.yaw)
                 r.sleep()
-
-
-        rospy.loginfo('end = %f', end_orient)
 
         move_cmd.linear.x = 0 # do not move     
         move_cmd.angular.z = 0 # stop turning   
@@ -684,7 +569,7 @@ class Meandre():
         fields = ['Time', 'Position_x', 'Position_y', 'Metrics'] 
 
         # name of csv file 
-        filename = "/home/christina/catkin_ws/src/multiple_turtlebots_nav/src/statistics.csv"
+        filename = "/home/christina/catkin_ws/src/multiple_turtlebots_nav/src/statistics_2.csv"
 
         # writing to csv file 
         with open(filename, 'w') as csvfile: 

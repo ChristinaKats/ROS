@@ -4,10 +4,10 @@
   <group ns="robot1">
     <!-- <param name="tf_prefix" value="robot1_tf" /> -->
     <include file="$(find multiple_turtlebots_nav)/launch/include/robot.launch.xml" >
-      <arg name="initial_pose_x" value="1" />
-      <arg name="initial_pose_y" value="1" />
+      <arg name="initial_pose_x" value="0" />
+      <arg name="initial_pose_y" value="0" />
       <arg name="initial_pose_z" value="0" />
-      <arg name="initial_pose_yaw" value="3.1415926" />
+      <arg name="initial_pose_yaw" value="-1.616458" />
       <arg name="robot_name"  value="robot1" />
     </include>
   </group>
@@ -19,7 +19,7 @@
       <arg name="initial_pose_x" value="-1" />
       <arg name="initial_pose_y" value="1" />
       <arg name="initial_pose_z" value="0" />
-      <arg name="initial_pose_yaw" value="0" />
+      <arg name="initial_pose_yaw" value="-1.616458" />
       <arg name="robot_name"  value="robot2" />
     </include>
   </group>

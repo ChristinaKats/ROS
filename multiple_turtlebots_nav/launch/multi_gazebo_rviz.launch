@@ -2,14 +2,14 @@
   <node pkg="tf" type="static_transform_publisher" name="link1_broadcaster" args="1 0 0 0 0 0 1 link1_parent link1 100" />
   <param name="/use_sim_time" value="true"/>
   <!-- <arg name="world_file"  default="$(env TURTLEBOT_GAZEBO_WORLD_FILE)"/> -->
-  <arg name="world_file"  default="$(find multiple_turtlebots_nav)/worlds/mapped.world"/>
+  <arg name="world_file"  default="$(find multiple_turtlebots_nav)/worlds/simple_2t_mapped.world"/>
   <arg name="gui" default="true"/>
 
-   <!-- Map server -->
+   <!-- Map server
   <arg name="map_file" default="$(find multiple_turtlebots_nav)/maps/map.yaml"/> 
   <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)" >
        <param name="frame_id" value="/map"/>
-  </node>
+  </node> -->
 
   <!-- start world -->
   <include file="$(find multiple_turtlebots_nav)/launch/empty_world.launch">
@@ -23,10 +23,10 @@
   <!-- include our robots -->
   <include file="$(find multiple_turtlebots_nav)/launch/include/robots.launch.xml"/>
 
-  <!-- Rviz -->
+  <!-- Rviz
   <arg name="node_start_delay" default="1.0" />  
   <node pkg="rviz" type="rviz" name="rviz" args="-d $(find multiple_turtlebots_nav)/rviz/agents.rviz"
-  output="screen" launch-prefix="bash -c 'sleep $(arg node_start_delay); $0 $@' "/>
+  output="screen" launch-prefix="bash -c 'sleep $(arg node_start_delay); $0 $@' "/> -->
 
 
   <!-- Fake laser -->
